@@ -205,7 +205,7 @@ resource "google_compute_instance" "confidential_instance" {
     ssh-keys = " "
       }
 }
-
+#################################################firewall_rules##################################################
 # Data source to get authenticated user's email via OpenID
 data "google_client_openid_userinfo" "me" {}
 
@@ -277,5 +277,19 @@ resource "google_compute_firewall" "allow_all_sctp_to_node_group" {
 
   target_tags = ["no-external-ip"]  # Ensure your nodes are tagged with "no-external-ip"
 }
+resource "google_compute_firewall" "allow_egress" {
+  name    = "allow-egress"
+  network = google_compute_network.vpc_network.name  # Use your network if different
+
+  direction = "EGRESS"
+  priority  = 1000
+
+  allow {
+    protocol = "all"
+  }
+
+  destination_ranges = ["0.0.0.0/0"]  # Allow all egress traffic to external networks
+}
+
 
 ########################## End of Configuration ##############################
