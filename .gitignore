@@ -1,0 +1,6 @@
+key.json
+.terraform/*
+.terra*
+tfplan*
+tfapply*
+*.tfstate
