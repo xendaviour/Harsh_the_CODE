@@ -206,6 +206,8 @@ resource "google_compute_instance" "confidential_instance" {
     sudo snap install kubelogin -y
     sudo mkdir /home/user/terraform
     sudo chown user:user /home/user/terraform
+    echo "alias k='kubectl'" >> ~/.bashrc
+    source ~/.bashrc
     EOF
 }
 
