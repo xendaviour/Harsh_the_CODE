@@ -1,8 +1,18 @@
+########################## IAM Permissions (Owner Role) ##########################
+
+resource "google_project_iam_member" "iam_owner" {
+  project = "harshthecode"
+  role    = "roles/owner"
+  member  = "serviceAccount:terraform-vm-sa@harshthecode.iam.gserviceaccount.com"
+  
+  depends_on = [google_service_account.default]  # Make sure the service account is created before this IAM member
+}
+
 ########################## Static IP Address ##########################################
 
 resource "google_compute_address" "static_ip" {
   name   = "new-static-ip"
-  region = "asia-south1"
+  region = "asia-south1-a"
 }
 
 ########################## Service Account ##########################################
@@ -22,7 +32,7 @@ resource "google_compute_network" "vpc_network" {
 resource "google_compute_subnetwork" "subnetwork" {
   name                     = "subnetwork"
   ip_cidr_range            = "10.0.0.0/16"
-  region                   = "asia-south1"
+  region                   = "asia-south1-a"
   network                  = google_compute_network.vpc_network.id
   private_ip_google_access = true
 }
@@ -88,11 +98,15 @@ resource "google_container_node_pool" "cheap_pool" {
     auto_upgrade = true
     auto_repair  = true
   }
+
+  depends_on = [google_container_cluster.htc_argo]  # Ensure node pool is created after the cluster
 }
 
 ########################## Kubernetes Resources ##########################################
 
 resource "kubernetes_deployment" "nginx" {
+  depends_on = [google_container_cluster.htc_argo]  # Ensure GKE cluster is created first
+
   metadata {
     name      = "nginx-deployment"
     namespace = "default"
@@ -129,6 +143,8 @@ resource "kubernetes_deployment" "nginx" {
 }
 
 resource "kubernetes_service" "nginx" {
+  depends_on = [google_container_cluster.htc_argo]  # Ensure GKE cluster is created first
+
   metadata {
     name      = "nginx-service"
     namespace = "default"
@@ -152,7 +168,7 @@ resource "kubernetes_service" "nginx" {
 
 resource "google_storage_bucket" "gcsfirst" {
   name          = "harsh_the_code_bucket"
-  location      = "asia-south1"
+  location      = "asia-south1-a"
   public_access_prevention = "enforced"
 }
 
@@ -206,6 +222,12 @@ resource "google_compute_instance" "confidential_instance" {
     sudo snap install kubelogin -y
     sudo mkdir /home/user/terraform
     sudo chown user:user /home/user/terraform
+    echo "alias k='kubectl'" >> ~/.bashrc
+    source ~/.bashrc
+    sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
+    gcloud container clusters get-credentials htc-argo --region asia-south1-a --project harshthecode
+
+
     EOF
 }
 
@@ -290,6 +312,13 @@ resource "google_compute_firewall" "allow_egress" {
   }
 
   destination_ranges = ["0.0.0.0/0"]
+}
+
+########################### IAM ##############################################
+resource "google_project_iam_member" "container_cluster_viewer" {
+  project = "harshthecode"  # Replace with your GCP project ID
+  role    = "roles/container.clusterViewer"
+  member  = "serviceAccount:terraform-vm-sa@harshthecode.iam.gserviceaccount.com"
 }
 
 ########################## End of Configuration ##############################
