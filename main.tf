@@ -1,3 +1,17 @@
+########################## Static IP Address ##########################################
+
+resource "google_compute_address" "static_ip" {
+  name   = "new-static-ip"
+  region = "asia-south1"
+}
+
+########################## Service Account ##########################################
+
+resource "google_service_account" "default" {
+  account_id   = "terraform-vm-sa"
+  display_name = "Terraform Service Account"
+}
+
 ########################## Google Kubernetes Engine Cluster ##########################
 
 resource "google_compute_network" "vpc_network" {
@@ -142,17 +156,7 @@ resource "google_storage_bucket" "gcsfirst" {
   public_access_prevention = "enforced"
 }
 
-########################## VM with Static IP ##########################################
-
-resource "google_compute_address" "static_ip" {
-  name   = "new-static-ip"
-  region = "asia-south1"
-}
-
-resource "google_service_account" "default" {
-  account_id   = "terraform-vm-sa"
-  display_name = "terraform-gcp-sa VM Instance"
-}
+########################## VM Instance ##########################################
 
 resource "google_compute_instance" "confidential_instance" {
   name         = "first-instance"
@@ -186,45 +190,23 @@ resource "google_compute_instance" "confidential_instance" {
     scopes = ["cloud-platform"]
   }
 
-   metadata = {
-    ssh-keys = " "
-    # Add a startup script to install Kubernetes and Apache
-    metadata_startup_script = <<-EOT
-      #!/bin/bash
+  metadata_startup_script = <<-EOF
+    #!/bin/bash
 
-      # Update and install necessary packages
-      apt-get update -y
-      apt-get upgrade -y
-
-      # Install Docker (required by Kubernetes)
-      apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-      curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
-      add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-      apt-get update -y
-      apt-get install -y docker-ce
-
-      # Enable and start Docker
-      systemctl enable docker
-      systemctl start docker
-
-      # Install Kubernetes tools (kubectl, kubeadm, kubelet)
-      curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-      apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
-      apt-get update -y
-      apt-get install -y kubeadm kubelet kubectl
-
-      # Mark Kubernetes packages to prevent accidental updates
-      apt-mark hold kubeadm kubelet kubectl
-
-      # Install Apache
-      apt-get install -y apache2
-      systemctl enable apache2
-      systemctl start apache2
-
-      # Output a message for debugging
-      echo "Startup script executed: Kubernetes and Apache installed" >> /var/log/startup-script.log
-    EOT
-  }
+    sudo curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    sudo curl -LO "https://dl.k8s.io/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+    sudo echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+    curl -LO https://dl.k8s.io/release/v1.23.0/bin/linux/amd64/kubectl
+    sudo install -o root -g root -m 0755 kubectl /bin/kubectl
+    wget -O helm.tar.gz https://get.helm.sh/helm-v3.5.4-linux-amd64.tar.gz
+    tar -zxvf helm.tar.gz
+    sudo mv linux-amd64/helm /bin/helm
+    sudo apt update -y
+    sudo apt install azure-cli -y
+    sudo snap install kubelogin -y
+    sudo mkdir /home/user/terraform
+    sudo chown user:user /home/user/terraform
+    EOF
 }
 
 ########################## Firewall Rules ##########################################
